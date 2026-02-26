@@ -1,0 +1,3 @@
+[submodule "Sources/rocksdb"]
+	path = Sources/rocksdb
+	url = git@github.pie.apple.com:rfalk/rocksdb.git

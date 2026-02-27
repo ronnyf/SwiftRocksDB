@@ -82,6 +82,54 @@ RocksDB's build generates `util/build_version.cc` from a template at build time.
 | `ROCKSDB_FALLOCATE_PRESENT` | `fallocate()` is Linux-only |
 | `ROCKSDB_RANGESYNC_PRESENT` | `sync_file_range()` is Linux-only |
 
+## Compression Libraries
+
+RocksDB supports optional compression backends, each gated by a preprocessor define in `util/compression.h`. Three are currently enabled.
+
+### Snappy (submodule)
+
+Snappy is included as a git submodule at `Sources/snappy/` and compiled as a separate SPM target (`CSnappy`).
+
+**Why `CSnappy` not `snappy`?** SPM auto-detects `snappy.h` as an umbrella header when the target name matches the filename. This triggers a validation that rejects subdirectories (`third_party/`, `testdata/`, etc.) alongside the umbrella header. This validation runs *before* `exclude:` is applied, so excluding those directories doesn't help. Renaming the target to `CSnappy` avoids the collision.
+
+**Generated files** in `Sources/snappy-generated/`:
+
+| File | Purpose |
+|------|---------|
+| `config.h` | Platform feature detection — builtins, POSIX headers, NEON on arm64. Replaces CMake's `cmake/config.h.in` configure step. |
+| `snappy-stubs-public.h` | Processed from `snappy-stubs-public.h.in` — sets version (1.2.2) and `HAVE_SYS_UIO_H`. |
+
+Both files are found by the `CSnappy` target via `.headerSearchPath("../snappy-generated")`. The `rocksdb` target also needs this search path because when it includes `<snappy.h>` (from `CSnappy`'s public headers), the compiler processes `#include "snappy-stubs-public.h"` inside `snappy.h` using rocksdb's own include paths.
+
+**Snappy target excludes:** The `third_party/` directory contains googletest and benchmark with many `.h` and `.cc` files. `snappy-test.h` pulls in `lzo/lzo1x.h` and `lz4.h` which don't exist. Both must be excluded to prevent SPM module map generation failures.
+
+**Alternative approach (not yet implemented):** Create a `Sources/CSnappy/` wrapper directory with `include/` containing symlinks to only the public snappy headers. This gives precise control over the public header surface and eliminates the exclude list. Source files may be referenceable via relative paths from the wrapper target.
+
+### zlib and bzip2 (system SDK)
+
+Both `libz` and `libbz2` ship in the macOS and iOS SDKs (headers at `$SDK/usr/include/`, `.tbd` stubs at `$SDK/usr/lib/`). No submodules needed — linked via:
+
+```swift
+linkerSettings: [
+    .linkedLibrary("z"),
+    .linkedLibrary("bz2"),
+]
+```
+
+### lz4 and zstd (not available)
+
+Neither `lz4` nor `zstd` is included in Apple SDKs. Enabling these would require adding them as source submodules, similar to snappy. RocksDB gates them with `LZ4` and `ZSTD` defines respectively (in `util/compression.h`). Not currently enabled.
+
+### Compression define summary
+
+| Define | Library | Source | RocksDB gating |
+|--------|---------|--------|----------------|
+| `SNAPPY` | Snappy 1.2.2 | Git submodule (`CSnappy` target) | `#ifdef SNAPPY` |
+| `ZLIB` | zlib | System SDK (`-lz`) | `#ifdef ZLIB` |
+| `BZIP2` | bzip2 | System SDK (`-lbz2`) | `#ifdef BZIP2` |
+| `LZ4` | lz4 | *Not enabled* | `#if defined(LZ4)` |
+| `ZSTD` | zstd | *Not enabled* | `#ifdef ZSTD` |
+
 ## Submodule Patches
 
 Two patches are applied to the RocksDB submodule to enable SwiftPM's auto-generated module map (no custom `module.modulemap` needed):
@@ -101,16 +149,20 @@ A custom modulemap with `exclude header` directives would also work, but patchin
 ## SPM Target Structure
 
 ```
-rocksdb (C++ library)
-  └── Sources/rocksdb/        — RocksDB v10.10.1 source (git submodule)
+CSnappy (C++ library)
+  └── Sources/snappy/            — Snappy 1.2.2 source (git submodule)
+      (generated headers in Sources/snappy-generated/)
+
+rocksdb (C++ library, depends on CSnappy)
+  └── Sources/rocksdb/           — RocksDB v10.10.1 source (git submodule)
 
 rocksdb-generated (C++ library, depends on rocksdb)
   └── Sources/rocksdb-generated/
-      ├── build_version.cc    — static build version info
-      └── include/            — public headers (if any)
+      ├── build_version.cc       — static build version info
+      └── include/               — public headers (if any)
 
 SwiftRocksDB (Swift library, depends on rocksdb + rocksdb-generated)
-  └── Sources/SwiftRocksDB/   — Swift wrapper APIs
+  └── Sources/SwiftRocksDB/      — Swift wrapper APIs
 
 SwiftRocksDB-cli (executable "swrocks", depends on rocksdb + rocksdb-generated)
   └── Sources/SwiftRocksDB-cli/

@@ -25,10 +25,48 @@ let package = Package(
         )
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
+        // Snappy compression library (git submodule).
+        // Target named "CSnappy" (not "snappy") to avoid SPM treating snappy.h
+        // as an umbrella header, which conflicts with subdirectories in the repo.
+        // Generated headers (config.h, snappy-stubs-public.h) live in
+        // Sources/snappy-generated/.
+        .target(
+            name: "CSnappy",
+            path: "Sources/snappy",
+            exclude: [
+                "third_party",
+                "testdata",
+                "cmake",
+                "docs",
+                ".github",
+                ".bazelrc",
+                // Test/benchmark headers and sources
+                "snappy-test.h",
+                "snappy-test.cc",
+                "snappy_test_data.h",
+                "snappy_test_data.cc",
+                "snappy_unittest.cc",
+                "snappy_benchmark.cc",
+                "snappy_test_tool.cc",
+                "snappy_compress_fuzzer.cc",
+                "snappy_uncompress_fuzzer.cc",
+            ],
+            sources: [
+                "snappy.cc",
+                "snappy-c.cc",
+                "snappy-sinksource.cc",
+                "snappy-stubs-internal.cc",
+            ],
+            publicHeadersPath: ".",
+            cxxSettings: [
+                .define("HAVE_CONFIG_H"),
+                // config.h and snappy-stubs-public.h live in snappy-generated/
+                .headerSearchPath("../snappy-generated"),
+            ]
+        ),
         .target(
             name: "rocksdb",
+            dependencies: ["CSnappy"],
             path: "Sources/rocksdb",
             sources: [
                 "cache/cache.cc",
@@ -398,6 +436,17 @@ let package = Package(
                 .define("HAVE_FULLFSYNC"),
                 // 128-bit integers (supported by Apple Clang)
                 .define("HAVE_UINT128_EXTENSION"),
+                // Compression: snappy (submodule), zlib + bzip2 (system SDK)
+                .define("SNAPPY"),
+                .define("ZLIB"),
+                .define("BZIP2"),
+                // snappy-stubs-public.h is generated in snappy-generated/;
+                // needed when the compiler processes snappy.h from the CSnappy dependency
+                .headerSearchPath("../snappy-generated"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
             ]
         ),
         .target(

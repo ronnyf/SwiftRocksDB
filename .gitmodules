@@ -1,3 +1,6 @@
 [submodule "Sources/rocksdb"]
 	path = Sources/rocksdb
 	url = git@github.pie.apple.com:rfalk/rocksdb.git
+[submodule "Sources/snappy"]
+	path = Sources/snappy
+	url = git@github.pie.apple.com:rfalk/snappy.git

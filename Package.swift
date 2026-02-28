@@ -7,7 +7,7 @@ let package = Package(
     name: "SwiftRocksDB",
     platforms: [
         .iOS(.v26),
-        .macOS(.v26)
+        .macOS(.v26),
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
@@ -22,7 +22,7 @@ let package = Package(
         .executable(
             name: "swrocks",
             targets: ["SwiftRocksDB-cli"],
-        )
+        ),
     ],
     targets: [
         // Snappy compression library (git submodule).
@@ -62,7 +62,9 @@ let package = Package(
                 .define("HAVE_CONFIG_H"),
                 // config.h and snappy-stubs-public.h live in snappy-generated/
                 .headerSearchPath("../snappy-generated"),
-            ]
+                // Size optimization
+                .define("NDEBUG"),
+            ],
         ),
         .target(
             name: "rocksdb",
@@ -443,6 +445,9 @@ let package = Package(
                 // snappy-stubs-public.h is generated in snappy-generated/;
                 // needed when the compiler processes snappy.h from the CSnappy dependency
                 .headerSearchPath("../snappy-generated"),
+                // Size optimization
+                .define("NDEBUG"),
+                .unsafeFlags(Package.unsafeFlagsRocksDB),
             ],
             linkerSettings: [
                 .linkedLibrary("z"),
@@ -457,14 +462,14 @@ let package = Package(
             publicHeadersPath: "include",
             cxxSettings: [
                 .define("ROCKSDB_PLATFORM_POSIX"),
-                .define("OS_MACOSX")
+                .define("OS_MACOSX"),
             ]
         ),
         .target(
             name: "SwiftRocksDB",
             dependencies: [
                 "rocksdb",
-                "rocksdb-generated"
+                "rocksdb-generated",
             ],
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
@@ -474,14 +479,26 @@ let package = Package(
             name: "SwiftRocksDB-cli",
             dependencies: [
                 "rocksdb",
-                "rocksdb-generated"
+                "rocksdb-generated",
             ],
             path: "Sources/SwiftRocksDB-cli",
             swiftSettings: [
                 .interoperabilityMode(.Cxx)
-            ]
-        )
+            ],
+        ),
     ],
     swiftLanguageModes: [.v6],
     cxxLanguageStandard: .cxx20
 )
+
+extension Package {
+    static var unsafeFlagsRocksDB: [String] {
+        [
+            "-fno-rtti",
+            "-fvisibility=hidden",
+            "-fvisibility-inlines-hidden",
+            "-ffunction-sections",
+            "-fdata-sections",
+        ]
+    }
+}

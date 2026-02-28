@@ -1,0 +1,16 @@
+INFOPLIST_FILE = RocksDBInternal.xcodeproj/RocksDBInternal-Info.plist
+PRODUCT_BUNDLE_IDENTIFIER = com.apple.RocksDBInternal
+PRODUCT_MODULE_NAME = RocksDBInternal
+PRODUCT_NAME = RocksDBInternal
+
+HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/rocksdb/include $(SRCROOT)/Sources/rocksdb $(SRCROOT)/Sources/snappy $(SRCROOT)/Sources/snappy-generated
+USER_HEADER_SEARCH_PATHS = $(SRCROOT)/Sources/rocksdb $(SRCROOT)/Sources/rocksdb/include $(SRCROOT)/Sources/snappy $(SRCROOT)/Sources/snappy-generated
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) NDEBUG=1 ROCKSDB_PLATFORM_POSIX=1 ROCKSDB_LIB_IO_POSIX=1 OS_MACOSX=1 PORTABLE=1 HAVE_FULLFSYNC=1 HAVE_UINT128_EXTENSION=1 ZLIB=1 BZIP2=1 SNAPPY=1 HAVE_CONFIG_H=1
+GCC_PREPROCESSOR_DEFINITIONS[sdk=iphoneos*] = $(inherited) IOS_CROSS_COMPILE=1
+GCC_PREPROCESSOR_DEFINITIONS[sdk=iphoneos*] = $(inherited) IOS_CROSS_COMPILE=1
+
+// Suppress warnings from upstream RocksDB source
+WARNING_CFLAGS = $(inherited) -Wno-comma -Wno-unreachable-code -Wno-newline-eof -Wno-invalid-offsetof
+
+OTHER_LDFLAGS = $(inherited) -lz -lbz2 -Wl,-no_warn_inits
+
